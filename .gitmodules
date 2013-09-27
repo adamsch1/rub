@@ -1,0 +1,3 @@
+[submodule "tcc"]
+	path = tcc
+	url = https://github.com/adamsch1/tcc

@@ -1,0 +1,36 @@
+#ifndef __SPLIT__H
+#define __SPLIT__H
+
+#include <stddef.h>
+
+#define dprintf(...) printf(__VA_ARGS__)
+#define MAX_ENT 32
+#define MAX_LINE 256
+#define MAXNAME 16
+
+struct line_t {
+  const char *line;
+  struct line_t *next;
+};
+
+struct entity_t {
+  const char *name;
+  struct entity_t *next;
+  struct line_t *line;
+  struct line_t *curr;
+};
+
+
+struct entity_t * first_entity();
+void scpy( char *dst, const char *src, size_t dsize, int max );
+
+/** 
+ *  Platform dependent impl to get source code for program
+ */
+char *readprog( const char *filepath );
+struct entity_t * first_entity();
+struct entity_t * new_entity();
+struct line_t * new_line();
+struct line_t * first_line();
+
+#endif
