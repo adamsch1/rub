@@ -77,6 +77,7 @@ char * source_file( const char *fpath ) {
 err:
 
   if( buffer ) free(buffer);
+  buffer = 0;
 
 done:
   
