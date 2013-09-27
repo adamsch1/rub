@@ -48,7 +48,8 @@ static void syntax(void)
 
 /** 
  * read in contents of file specified at path 
- * you free memory 
+ * you free memory  - how many times do I have to fucking write this
+ * function?
  */
 char * source_file( const char *fpath ) {
   int fd = 0;
@@ -145,6 +146,9 @@ const char * config_get_str( const char *name ) {
   return *(const char **)p;
 }
 
+/**
+ * Weak attempt at log formatting using apache2 formatting not very efficient
+ */
 const char * log_format( const char *fmt, struct evhttp_request *req, 
                          int response_size ) {
   static char buffer[1024];
@@ -156,8 +160,11 @@ const char * log_format( const char *fmt, struct evhttp_request *req,
   int b=0;
   #define AVAIL (sizeof(buffer)-(s-buffer))
 
+  memset(buffer,0,sizeof(buffer));
+  buffer[0] = 0;
 
-  while( p && *p && (s - buffer < sizeof(buffer)) ) {
+  while( p && *p && AVAIL > 0 ) {
+    *s = 0;
     if( *p == '%' ) {
       p++;
       switch( *p ) {
@@ -185,6 +192,7 @@ const char * log_format( const char *fmt, struct evhttp_request *req,
           break;
       }
     } else {
+      // Copy non-control characters in log we know we have at least 1 byte
       *s = *p;
     }
     p++;
