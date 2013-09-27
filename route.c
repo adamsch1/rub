@@ -21,6 +21,9 @@ struct controller_t {
   char *path; 
   TCCState *state;
 
+  int   prog_size;
+  char *program;
+
   int (*prog_main)(int, char **);
 
   struct controller_t *next;
@@ -29,6 +32,7 @@ struct controller_t {
 // Maintains the list of controllers
 struct controller_t *controllers;
 
+// Anything we want passed to child script we place in this
 struct rub_t rub;
 
 /**
@@ -100,8 +104,10 @@ struct controller_t * load_controller( char * fpath, int *ecode ) {
   } else {
     // File was found and it compiled successfully
 
-    set_symbols( cont ); //tcc_add_symbol( cont->state, "get_rub", get_rub );
+    set_symbols( cont ); 
+
     tcc_relocate( cont->state, TCC_RELOCATE_AUTO );
+
     cont->prog_main = tcc_get_symbol(cont->state, "main");
 
     *ecode = HTTP_OK;
@@ -122,6 +128,11 @@ err:
   return NULL; 
 }
 
+/**
+ *  Iterate through controllers looking for one that handles the 
+ *  current request.  If this is the first time a controller has run
+ *  compile and cache the result.
+ */
 int run_controller( struct rub_t *rub, char * fpath  ){
   struct controller_t *iter = controllers;
   int err=HTTP_OK;
@@ -161,6 +172,7 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   char * final_path = NULL;
   struct evbuffer *evbuffer = NULL;
 
+  // Setup data structure we pass to controllers
   rub.req = req;
   rub.evb = evbuffer_new();
 
@@ -177,7 +189,7 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
     goto done;
   }
 
-  // calculate final script path 
+  // Calculate final script path  
   const char *path = evhttp_uri_get_path(decoded);
   asprintf( &final_path, "%s%s", script_root, path[0] == '/' ? path+1 : path );
 

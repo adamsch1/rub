@@ -30,46 +30,10 @@
 #include "tcc/libtcc.h"
 #include "rub.h"
 
+/**
+ *  For Compilation of our config file 
+ */
 TCCState *config_state;
-char uri_root[512];
-
-static const struct table_entry {
-  const char *extension;
-  const char *content_type;
-} content_type_table[] = {
-  { "txt", "text/plain" },
-  { "c", "text/plain" },
-  { "h", "text/plain" },
-  { "html", "text/html" },
-  { "htm", "text/htm" },
-  { "css", "text/css" },
-  { "gif", "image/gif" },
-  { "jpg", "image/jpeg" },
-  { "jpeg", "image/jpeg" },
-  { "png", "image/png" },
-  { "pdf", "application/pdf" },
-  { "ps", "application/postsript" },
-  { NULL, NULL },
-};
-
-/* Try to guess a good content-type for 'path' */
-static const char *
-guess_content_type(const char *path)
-{
-  const char *last_period, *extension;
-  const struct table_entry *ent;
-  last_period = strrchr(path, '.');
-  if (!last_period || strchr(last_period, '/'))
-    goto not_found; /* no exension */
-  extension = last_period + 1;
-  for (ent = &content_type_table[0]; ent->extension; ++ent) {
-    if (!evutil_ascii_strcasecmp(ent->extension, extension))
-      return ent->content_type;
-  }
-
-not_found:
-  return "application/misc";
-}
 
 /**
  *  Dump command line usage
@@ -84,29 +48,41 @@ static void syntax(void)
  * you free memory 
  */
 char * source_file( const char *fpath ) {
-  int fd;
-  char * buffer;
+  int fd = 0;
+  char * buffer = NULL;
   struct stat sb;
 
   if ((fd = open(fpath, O_RDONLY, 0)) < 0 || fstat(fd, &sb))
    err(EXIT_FAILURE, "source_file: %s", fpath);
 
+  // One extra byte for \0 at end
   buffer = malloc( sb.st_size+1 );
   if( !buffer ) {
-  err(EXIT_FAILURE, "source_file: malloc %s", fpath);
-  return NULL;
+    err(EXIT_FAILURE, "source_file: malloc %s", fpath);
+    goto err;
   }
 
+  // Read in the file in one shot
   if( read( fd, buffer, sb.st_size ) < 0 ) {
-  free(buffer);
-  err(EXIT_FAILURE, "source_file: malloc %s", fpath);
-  return NULL;
+    err(EXIT_FAILURE, "source_file: malloc %s", fpath);
+    goto err;
   }
 
+  // Null terminate this string
   buffer[sb.st_size] = 0;
+  return buffer;
+
+  goto done;
+
+err:
+
+  if( buffer ) free(buffer);
+
+done:
+  
+  if( fd ) close(fd);
 
   return buffer;
-  
 }
 
 
@@ -114,12 +90,12 @@ char * source_file( const char *fpath ) {
  *  Extract config variables for use in the program
  */
 static int read_config( char * config)  {
-  TCCState *s;
+  TCCState *s = NULL;
   s = tcc_new();
 
   if( !s ) {
-  err(EXIT_FAILURE, "read_config: could not create tcc state");
-  return -1;
+    err(EXIT_FAILURE, "read_config: could not create tcc state");
+    goto err;
   }
 
   tcc_set_lib_path( s, "./tcc" );
@@ -127,18 +103,27 @@ static int read_config( char * config)  {
   tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
 
   if( tcc_compile_string(s, config) == -1 ) {
-  err(EXIT_FAILURE, "read_config: Could not compile config file");
-  return -1;
+    err(EXIT_FAILURE, "read_config: Could not compile config file");
+    goto err;
   } 
 
   if( tcc_relocate(s, TCC_RELOCATE_AUTO) < 0 ) {
-  err(EXIT_FAILURE, "read_config: COuld not relocate code");
+    err(EXIT_FAILURE, "read_config: COuld not relocate code");
+    goto err;
   }
 
   config_state = s;
 
-  void *p = tcc_get_symbol(s, "RPort");
-  printf("Port: %d\n", *(int*)p);
+  goto done;
+
+err:
+  if( s ) tcc_delete( s );
+
+  return -1;
+
+done:
+
+  return 0;
 }
 
 /**
