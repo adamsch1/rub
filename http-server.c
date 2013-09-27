@@ -135,6 +135,7 @@ done:
  */
 int config_get_int( const char *name ) {
   void *p = tcc_get_symbol(config_state, name);
+  if( !p ) return -1;
   return *(int*)p;
 }
 
@@ -143,7 +144,17 @@ int config_get_int( const char *name ) {
  */
 const char * config_get_str( const char *name ) {
   void *p = tcc_get_symbol(config_state, name);
+  if( !p ) return 0;
   return *(const char **)p;
+}
+
+/**
+ * Get generic symbol as config value
+ */
+const void * config_get_obj( const char *name ) {
+  void *p = tcc_get_symbol(config_state, name);
+  if( !p ) return 0;
+  return p;
 }
 
 /**
@@ -255,7 +266,7 @@ int main(int argc, char **argv)
   /* We want to accept arbitrary requests, so we need to set a "generic"
    * cb.  We can also add callbacks for specific paths. */
   //evhttp_set_gencb(http, send_document_cb, strdup(doc_root));
-  evhttp_set_gencb(http, route_request_cb, strdup(doc_root));
+  evhttp_set_gencb(http, route_request_cb, NULL );
 
   /* Now we tell the evhttp what port to listen on */
   handle = evhttp_bind_socket_with_handle(http, address, port);

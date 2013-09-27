@@ -167,6 +167,7 @@ int run_controller( struct rub_t *rub, char * fpath  ){
 
 }
 
+#if 0
 static const struct table_entry {
     const char *extension;
     const char *content_type;
@@ -185,6 +186,7 @@ static const struct table_entry {
     { "ps", "application/postsript" },
     { NULL, NULL },
 };
+#endif
 
 /* Try to guess a good content-type for 'path' */
 static const char *
@@ -192,11 +194,17 @@ guess_content_type(const char *path)
 {
     const char *last_period, *extension;
     const struct table_entry *ent;
+    static const struct table_entry *table = NULL;
+
+    if( !table ) {
+      table = config_get_obj("content_type_table");
+    }
+
     last_period = strrchr(path, '.');
     if (!last_period || strchr(last_period, '/'))
         goto not_found; /* no exension */
     extension = last_period + 1;
-    for (ent = &content_type_table[0]; ent->extension; ++ent) {
+    for (ent = &table[0]; ent->extension; ++ent) {
         if (!evutil_ascii_strcasecmp(ent->extension, extension))
             return ent->content_type;
     }
@@ -219,8 +227,9 @@ int send_file( const char *path, struct rub_t *rub ) {
  
   if( !doc_root ) {
     doc_root = config_get_str("RDocRoot");
+    if( !doc_root ) return ecode;
   }
- 
+
   // Default to public document
   asprintf( &final_path, "%s%s", doc_root, path[0] == '/' ? path+1 : path );
   if( strstr(path, "../" ))  {
@@ -256,6 +265,7 @@ done:
 
   if( final_path ) free(final_path);
 
+  return ecode;
 }
 
 const char *script_root = NULL;
