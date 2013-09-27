@@ -1,7 +1,16 @@
 #ifndef __SPLIT__H
 #define __SPLIT__H
 
+#define _GNU_SOURCE
+
 #include <stddef.h>
+#include <event2/http.h>
+
+void route_request_cb( struct evhttp_request *req, void *arg );
+int config_get_int( const char *name );
+const char * config_get_str( const char *name );
+char * source_file( const char *fpath );
+
 
 #define dprintf(...) printf(__VA_ARGS__)
 #define MAX_ENT 32

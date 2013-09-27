@@ -12,7 +12,7 @@ configure_file (
 
 set(TCC tcc)
 set(CMAKE_BUILD_TYPE Debug)
-SET(P_SOURCE http-server.c)
+SET(P_SOURCE http-server.c route.c)
 
 include_directories("${PROJECT_BINARY_DIR}")
 
