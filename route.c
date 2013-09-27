@@ -192,6 +192,11 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
 
   // Calculate final script path  
   const char *path = evhttp_uri_get_path(decoded);
+  if( strstr(path, "../" ))  {
+    evhttp_send_reply(req, HTTP_BADREQUEST, "OK", NULL );
+    goto done;
+  }
+
   asprintf( &final_path, "%s%s", script_root, path[0] == '/' ? path+1 : path );
 
   int ecode = run_controller( &rub, final_path );
