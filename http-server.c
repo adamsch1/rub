@@ -26,6 +26,8 @@
 #include <event2/util.h>
 #include <event2/keyvalq_struct.h>
 
+#include "tcc/libtcc.h"
+
 char uri_root[512];
 
 static const struct table_entry {
@@ -251,20 +253,106 @@ syntax(void)
 	fprintf(stdout, "Syntax: http-server <docroot>\n");
 }
 
+/** 
+ * read in contents of file specified at path 
+ * you free memory 
+ */
+static char * source_file( const char *fpath ) {
+  int fd;
+  char * buffer;
+  struct stat sb;
+
+  if ((fd = open(fpath, O_RDONLY, 0)) < 0 || fstat(fd, &sb))
+     err(EXIT_FAILURE, "source_file: %s", fpath);
+
+  buffer = malloc( sb.st_size+1 );
+  if( !buffer ) {
+    err(EXIT_FAILURE, "source_file: malloc %s", fpath);
+    return NULL;
+  }
+
+  if( read( fd, buffer, sb.st_size ) < 0 ) {
+    free(buffer);
+    err(EXIT_FAILURE, "source_file: malloc %s", fpath);
+    return NULL;
+  }
+
+  buffer[sb.st_size] = 0;
+
+  return buffer;
+  
+}
+
+TCCState *config_state;
+
+/**
+ *  Extract config variables for use in the program
+ */
+static int read_config( char * config)  {
+  TCCState *s;
+  s = tcc_new();
+
+  if( !s ) {
+    err(EXIT_FAILURE, "read_config: could not create tcc state");
+    return -1;
+  }
+
+  tcc_set_lib_path( s, "./tcc" );
+
+  tcc_set_output_type(s, TCC_OUTPUT_MEMORY);
+
+  if( tcc_compile_string(s, config) == -1 ) {
+    err(EXIT_FAILURE, "read_config: Could not compile config file");
+    return -1;
+  } 
+
+  if( tcc_relocate(s, TCC_RELOCATE_AUTO) < 0 ) {
+    err(EXIT_FAILURE, "read_config: COuld not relocate code");
+  }
+
+  config_state = s;
+
+  void *p = tcc_get_symbol(s, "RPort");
+  printf("Port: %d\n", *(int*)p);
+}
+
+int config_get_int( const char *name ) {
+  void *p = tcc_get_symbol(config_state, name);
+  return *(int*)p;
+}
+
+const char * config_get_str( const char *name ) {
+  void *p = tcc_get_symbol(config_state, name);
+  return (const char *)p;
+}
+
 int
 main(int argc, char **argv)
 {
 	struct event_base *base;
 	struct evhttp *http;
 	struct evhttp_bound_socket *handle;
+    char   *config;
+    const char *doc_root;
 
 	unsigned short port = 0;
 	if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
 		return (1);
+
 	if (argc < 2) {
 		syntax();
 		return 1;
 	}
+
+    config = source_file(argv[1]);
+    if( config == NULL ) {
+      return 1;
+    }
+    read_config(config);
+    free(config);
+
+    port = config_get_int( "RPort" );
+    doc_root = config_get_str( "RDocRoot" );
 
 	base = event_base_new();
 	if (!base) {
@@ -284,7 +372,7 @@ main(int argc, char **argv)
 
 	/* We want to accept arbitrary requests, so we need to set a "generic"
 	 * cb.  We can also add callbacks for specific paths. */
-	evhttp_set_gencb(http, send_document_cb, argv[1]);
+	evhttp_set_gencb(http, send_document_cb, strdup(doc_root));
 
 	/* Now we tell the evhttp what port to listen on */
 	handle = evhttp_bind_socket_with_handle(http, "0.0.0.0", port);
