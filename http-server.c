@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <syslog.h>
+#include <time.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -23,6 +25,7 @@
 
 #include <event2/event.h>
 #include <event2/http.h>
+#include <event2/http_struct.h>
 #include <event2/buffer.h>
 #include <event2/util.h>
 #include <event2/keyvalq_struct.h>
@@ -52,19 +55,18 @@ char * source_file( const char *fpath ) {
   char * buffer = NULL;
   struct stat sb;
 
-  if ((fd = open(fpath, O_RDONLY, 0)) < 0 || fstat(fd, &sb))
-   err(EXIT_FAILURE, "source_file: %s", fpath);
+  if ((fd = open(fpath, O_RDONLY, 0)) < 0 || fstat(fd, &sb))  {
+    goto err;
+  }
 
   // One extra byte for \0 at end
   buffer = malloc( sb.st_size+1 );
   if( !buffer ) {
-    err(EXIT_FAILURE, "source_file: malloc %s", fpath);
     goto err;
   }
 
   // Read in the file in one shot
   if( read( fd, buffer, sb.st_size ) < 0 ) {
-    err(EXIT_FAILURE, "source_file: malloc %s", fpath);
     goto err;
   }
 
@@ -143,6 +145,55 @@ const char * config_get_str( const char *name ) {
   return *(const char **)p;
 }
 
+const char * log_format( const char *fmt, struct evhttp_request *req, 
+                         int response_size ) {
+  static char buffer[1024];
+  char timebuff[1024];
+  char *s = buffer;
+  const char*p = fmt;
+  struct tm *tmp;
+  time_t t;
+  int b=0;
+  #define AVAIL (sizeof(buffer)-(s-buffer))
+
+
+  while( p && *p && (s - buffer < sizeof(buffer)) ) {
+    if( *p == '%' ) {
+      p++;
+      switch( *p ) {
+        case 'l':
+        case 'u':
+          // Old crap that nobody uses
+          snprintf( s, 1024-(s-buffer), "%s-", s );
+          break;
+        case 't':
+          t = time(NULL);
+          tmp = localtime(&t);
+          strftime( timebuff, sizeof(timebuff), "[%d/%b/%Y:%T %z]", tmp );
+          snprintf( s, AVAIL, "%s%s", s, timebuff ); 
+          break;
+        case 'h':
+          snprintf( s, AVAIL, "%s%s", s,req->remote_host );
+          break;
+        case 'r':
+          snprintf( s, AVAIL, "%s%d", s,response_size);
+          break;
+        case 's':
+          snprintf( s, AVAIL, "%s%d", s,req->response_code );
+          break;
+        default:
+          break;
+      }
+    } else {
+      *s = *p;
+    }
+    p++;
+    s += strlen(s);
+  } 
+  return buffer;
+}
+
+
 int main(int argc, char **argv)
 {
   struct event_base *base;
@@ -150,9 +201,12 @@ int main(int argc, char **argv)
   struct evhttp_bound_socket *handle;
   char   *config;
   const char *doc_root;
+  const char *address;
 
   unsigned short port = 0;
 
+  openlog("rub", LOG_PID|LOG_CONS, LOG_LOCAL0);
+  
   // Ignore sigpipe
   if (signal(SIGPIPE, SIG_IGN) == SIG_ERR)
     return (1);
@@ -166,6 +220,7 @@ int main(int argc, char **argv)
   // Read in config file
   config = source_file(argv[1]);
   if( config == NULL ) {
+    syslog( LOG_ERR, "Could not read in: %s", argv[1]);
     return 1;
   }
   read_config(config);
@@ -173,18 +228,19 @@ int main(int argc, char **argv)
 
   port = config_get_int( "RPort" );
   doc_root = config_get_str( "RDocRoot" );
+  address = config_get_str( "RAddress" );
 
   // Start setting up libevent for HTTP
   base = event_base_new();
   if (!base) {
-    fprintf(stderr, "Couldn't create an event_base: exiting\n");
+    syslog( LOG_ERR, "Couldn't create an event_base: exiting\n");
     return 1;
   }
 
   /* Create a new evhttp object to handle requests. */
   http = evhttp_new(base);
   if (!http) {
-    fprintf(stderr, "couldn't create evhttp. Exiting.\n");
+    syslog( LOG_ERR, "Couldn't create evhttp: exiting\n");
     return 1;
   }
 
@@ -194,13 +250,13 @@ int main(int argc, char **argv)
   evhttp_set_gencb(http, route_request_cb, strdup(doc_root));
 
   /* Now we tell the evhttp what port to listen on */
-  handle = evhttp_bind_socket_with_handle(http, "0.0.0.0", port);
+  handle = evhttp_bind_socket_with_handle(http, address, port);
   if (!handle) {
-    fprintf(stderr, "couldn't bind to port %d. Exiting.\n",
-      (int)port);
+    syslog( LOG_ERR, "Could not bind to port %d: exiting", (int)port);
     return 1;
   }
 
+  syslog( LOG_INFO, "Rub is ready.");
   event_base_dispatch(base);
 
   return 0;

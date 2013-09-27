@@ -140,7 +140,8 @@ int run_controller( struct rub_t *rub, char * fpath  ){
   while( iter ) {
     if( strcmp(iter->path, fpath) == 0 ) {
       break;
-    }
+    } 
+    iter = iter->next;
   }
 
   if( !iter ) {
@@ -168,7 +169,7 @@ const char *script_root = NULL;
 void route_request_cb( struct evhttp_request *req, void *arg ) {
   const struct evhttp_uri *decoded;
   const char *uri = evhttp_request_get_uri(req);
-
+  int response_size = 0;
   char * final_path = NULL;
   struct evbuffer *evbuffer = NULL;
 
@@ -195,8 +196,10 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
 
   int ecode = run_controller( &rub, final_path );
 
+  response_size = evbuffer_get_length( rub.evb );
   evhttp_send_reply(req, ecode, "OK", rub.evb );
 
+  syslog( LOG_INFO, log_format( "%h %l %u %t %s %r", req, response_size) );
 done:
 
   if( rub.evb ) evbuffer_free( rub.evb );

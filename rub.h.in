@@ -5,6 +5,7 @@
 
 #include <stddef.h>
 #include <event2/http.h>
+#include <syslog.h>
 
 void route_request_cb( struct evhttp_request *req, void *arg );
 int config_get_int( const char *name );
@@ -18,6 +19,10 @@ struct rub_t {
 };
 
 struct rub_t *rub_get_request();
+
+
+const char * log_format( const char *fmt, struct evhttp_request *req,
+                         int response_size );
 
 #define dprintf(...) printf(__VA_ARGS__)
 #define MAX_ENT 32
