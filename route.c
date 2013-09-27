@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
 
 #include "tcc/libtcc.h"
 
@@ -164,14 +167,106 @@ int run_controller( struct rub_t *rub, char * fpath  ){
 
 }
 
+static const struct table_entry {
+    const char *extension;
+    const char *content_type;
+} content_type_table[] = {
+    { "txt", "text/plain" },
+    { "c", "text/plain" },
+    { "h", "text/plain" },
+    { "html", "text/html" },
+    { "htm", "text/htm" },
+    { "css", "text/css" },
+    { "gif", "image/gif" },
+    { "jpg", "image/jpeg" },
+    { "jpeg", "image/jpeg" },
+    { "png", "image/png" },
+    { "pdf", "application/pdf" },
+    { "ps", "application/postsript" },
+    { NULL, NULL },
+};
+
+/* Try to guess a good content-type for 'path' */
+static const char *
+guess_content_type(const char *path)
+{
+    const char *last_period, *extension;
+    const struct table_entry *ent;
+    last_period = strrchr(path, '.');
+    if (!last_period || strchr(last_period, '/'))
+        goto not_found; /* no exension */
+    extension = last_period + 1;
+    for (ent = &content_type_table[0]; ent->extension; ++ent) {
+        if (!evutil_ascii_strcasecmp(ent->extension, extension))
+            return ent->content_type;
+    }
+
+not_found:
+    return "application/misc";
+}
+
+
+
+/**
+ *  Send a normal file back - no attempt to compile or interpret
+ */
+const char *doc_root = NULL;
+int send_file( const char *path, struct rub_t *rub ) {
+  int ecode = HTTP_NOTFOUND;
+  struct stat st;
+  char *final_path = NULL;
+  int fd;
+ 
+  if( !doc_root ) {
+    doc_root = config_get_str("RDocRoot");
+  }
+ 
+  // Default to public document
+  asprintf( &final_path, "%s%s", doc_root, path[0] == '/' ? path+1 : path );
+  if( strstr(path, "../" ))  {
+    evhttp_send_reply(rub->req, HTTP_BADREQUEST, "OK", NULL );
+    goto done;
+  }
+
+  const char *type = guess_content_type( final_path );
+
+  if( (fd=open(final_path, O_RDONLY)) < 0 ) {
+    syslog(LOG_ERR, "Could not open: %s", final_path );
+    goto err;
+  }
+
+  if( fstat( fd, &st) < 0 ) {
+    syslog(LOG_ERR, "Could not fstat: %s", final_path );
+    goto err;
+  }
+
+  evhttp_add_header( evhttp_request_get_output_headers(rub->req),
+                     "Content-Type", type );
+  evbuffer_add_file( rub->evb, fd, 0, st.st_size );
+
+  ecode = HTTP_OK;
+
+  goto done;
+
+err:
+
+  if( fd > 0 ) close(fd);
+
+done:
+
+  if( final_path ) free(final_path);
+
+}
+
 const char *script_root = NULL;
+
+const char * FMT = "%h %l %u %t %s %r";
 
 void route_request_cb( struct evhttp_request *req, void *arg ) {
   const struct evhttp_uri *decoded;
   const char *uri = evhttp_request_get_uri(req);
   int response_size = 0;
   char * final_path = NULL;
-  struct evbuffer *evbuffer = NULL;
 
   // Setup data structure we pass to controllers
   rub.req = req;
@@ -200,11 +295,14 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   asprintf( &final_path, "%s%s", script_root, path[0] == '/' ? path+1 : path );
 
   int ecode = run_controller( &rub, final_path );
+  if( ecode == HTTP_NOTFOUND ) {
+    ecode =send_file( path, &rub );
+  }
 
   response_size = evbuffer_get_length( rub.evb );
   evhttp_send_reply(req, ecode, "OK", rub.evb );
 
-  syslog( LOG_INFO, log_format( "%h %l %u %t %s %r", req, response_size) );
+  syslog( LOG_INFO, "%s", log_format( FMT, req, response_size) );
 done:
 
   if( rub.evb ) evbuffer_free( rub.evb );
