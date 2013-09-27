@@ -29,6 +29,40 @@ struct controller_t {
 // Maintains the list of controllers
 struct controller_t *controllers;
 
+struct rub_t rub;
+
+/**
+ *  Symbols you want exported to controller set here
+ */
+struct symbol_map_t {
+  char * name;
+  void * symbol;
+} symbol_map[] = {
+  { "rub_get_request", rub_get_request },
+  NULL
+};
+
+/**
+ *  Add all symbols to controller in one shot
+ */
+void set_symbols( struct controller_t *cont ) {
+
+  int k=0;
+  
+  while( symbol_map[k].name ) {
+    tcc_add_symbol( cont->state, symbol_map[k].name,
+      symbol_map[k].symbol );
+    k++;
+  }
+}
+
+/**
+ *  We chuck a bunch of libevent http stuff in a rub_t struct
+ */
+struct rub_t * rub_get_request()  {
+  return &rub;
+}
+
 /**
  *  Load a controller and compile it, we map general system errors 
  *  to a HTTP friendly value set in ecode, or we set ecode to 404 if 
@@ -66,6 +100,7 @@ struct controller_t * load_controller( char * fpath, int *ecode ) {
   } else {
     // File was found and it compiled successfully
 
+    set_symbols( cont ); //tcc_add_symbol( cont->state, "get_rub", get_rub );
     tcc_relocate( cont->state, TCC_RELOCATE_AUTO );
     cont->prog_main = tcc_get_symbol(cont->state, "main");
 
@@ -87,7 +122,7 @@ err:
   return NULL; 
 }
 
-int run_controller( struct evhttp_request *req, char * fpath  ){
+int run_controller( struct rub_t *rub, char * fpath  ){
   struct controller_t *iter = controllers;
   int err=HTTP_OK;
 
@@ -126,6 +161,9 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   char * final_path = NULL;
   struct evbuffer *evbuffer = NULL;
 
+  rub.req = req;
+  rub.evb = evbuffer_new();
+
   // Setup where we are sourcing scripts from
   if( ! script_root ) {
     script_root = config_get_str( "RScriptRoot" );
@@ -143,12 +181,13 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   const char *path = evhttp_uri_get_path(decoded);
   asprintf( &final_path, "%s%s", script_root, path[0] == '/' ? path+1 : path );
 
-  int ecode = run_controller( req, final_path );
+  int ecode = run_controller( &rub, final_path );
 
-  evhttp_send_reply(req, ecode, "OK", NULL );
+  evhttp_send_reply(req, ecode, "OK", rub.evb );
 
 done:
 
+  if( rub.evb ) evbuffer_free( rub.evb );
   if( final_path ) free(final_path); 
    
 }

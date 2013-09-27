@@ -11,6 +11,13 @@ int config_get_int( const char *name );
 const char * config_get_str( const char *name );
 char * source_file( const char *fpath );
 
+struct rub_t {
+  struct evhttp_request *req;
+  struct evbuffer *evb;
+  int a;
+};
+
+struct rub_t *rub_get_request();
 
 #define dprintf(...) printf(__VA_ARGS__)
 #define MAX_ENT 32
