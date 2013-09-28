@@ -26,6 +26,14 @@ struct table_entry {
   const char *content_type;
 };
 
+struct config_t {
+  const char *doc_root;
+  const char *script_root;
+  const char *address;
+  unsigned short port;
+  int display_error;
+};
+
 struct rub_t *rub_get_request();
 
 

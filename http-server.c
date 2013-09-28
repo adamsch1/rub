@@ -37,6 +37,7 @@
  *  For Compilation of our config file 
  */
 TCCState *config_state;
+const struct config_t *global_config;
 
 /**
  *  Dump command line usage
@@ -219,10 +220,6 @@ int main(int argc, char **argv)
   struct evhttp *http;
   struct evhttp_bound_socket *handle;
   char   *config;
-  const char *doc_root;
-  const char *address;
-
-  unsigned short port = 0;
 
   openlog("rub", LOG_PID|LOG_CONS, LOG_LOCAL0);
   
@@ -245,10 +242,13 @@ int main(int argc, char **argv)
   read_config(config);
   free(config);
 
+  global_config = config_get_obj( "config" );
+/*
   port = config_get_int( "RPort" );
   doc_root = config_get_str( "RDocRoot" );
   address = config_get_str( "RAddress" );
-
+  script_root = config_get_str( "RScriptRoot" );
+*/
   // Start setting up libevent for HTTP
   base = event_base_new();
   if (!base) {
@@ -269,9 +269,11 @@ int main(int argc, char **argv)
   evhttp_set_gencb(http, route_request_cb, NULL );
 
   /* Now we tell the evhttp what port to listen on */
-  handle = evhttp_bind_socket_with_handle(http, address, port);
+  handle = evhttp_bind_socket_with_handle(http, global_config->address, 
+                                          global_config->port);
   if (!handle) {
-    syslog( LOG_ERR, "Could not bind to port %d: exiting", (int)port);
+    syslog( LOG_ERR, "Could not bind to port %d: exiting", 
+            (int)global_config->port);
     return 1;
   }
 

@@ -39,6 +39,8 @@ struct controller_t *controllers;
 // Anything we want passed to child script we place in this
 struct rub_t rub;
 
+extern struct config_t *global_config;
+
 /**
  *  Symbols you want exported to controller set here
  */
@@ -110,14 +112,17 @@ void rub_reset_request() {
 
 }
 
+
 void error_function( void *user, const char *msg ) {
   struct rub_t *r = &rub;
 
-  evbuffer_add_printf( r->evb, "<html><head><title>Rub Compilation error</title></head>");
-  evbuffer_add_printf( r->evb, "Error: %s", msg );
-  evbuffer_add_printf( r->evb, "</html>" );
+  if( global_config->display_error  ) {
+    evbuffer_add_printf( r->evb, "<html><head><title>Rub Compilation error</title></head>");
+    evbuffer_add_printf( r->evb, "Error: %s", msg );
+    evbuffer_add_printf( r->evb, "</html>" );
+  }
 
-  syslog(LOG_ERR,"HERE: %s", msg );
+  syslog(LOG_ERR, "Compilation error: %s", msg );
 }
 
 /**
@@ -271,20 +276,20 @@ not_found:
 /**
  *  Send a normal file back - no attempt to compile or interpret
  */
-const char *doc_root = NULL;
 int send_file( const char *path, struct rub_t *rub ) {
   int ecode = HTTP_NOTFOUND;
   struct stat st;
   char *final_path = NULL;
   int fd;
  
-  if( !doc_root ) {
-    doc_root = config_get_str("RDocRoot");
-    if( !doc_root ) return ecode;
+  if( !global_config->doc_root ) {
+    // Dont' serve files
+    return ecode;
   }
 
   // Default to public document
-  asprintf( &final_path, "%s%s", doc_root, path[0] == '/' ? path+1 : path );
+  asprintf( &final_path, "%s%s", global_config->doc_root, 
+            path[0] == '/' ? path+1 : path );
   if( strstr(path, "../" ))  {
     evhttp_send_reply(rub->req, HTTP_BADREQUEST, "OK", NULL );
     goto done;
@@ -321,8 +326,6 @@ done:
   return ecode;
 }
 
-const char *script_root = NULL;
-
 const char * FMT = "%h %l %u %t %s %r";
 
 void route_request_cb( struct evhttp_request *req, void *arg ) {
@@ -335,11 +338,6 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   memset(&rub, 0, sizeof(rub));
   rub.req = req;
   rub.evb = evbuffer_new();
-
-  // Setup where we are sourcing scripts from
-  if( ! script_root ) {
-    script_root = config_get_str( "RScriptRoot" );
-  }
 
   // Parse HTTP request URI 
   decoded = evhttp_request_get_evhttp_uri(req);  
@@ -356,7 +354,8 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
     goto done;
   }
 
-  asprintf( &final_path, "%s%s", script_root, path[0] == '/' ? path+1 : path );
+  asprintf( &final_path, "%s%s", global_config->script_root, 
+            path[0] == '/' ? path+1 : path );
 
   int ecode = run_controller( &rub, final_path );
   if( ecode == HTTP_NOTFOUND ) {
