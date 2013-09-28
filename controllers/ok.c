@@ -6,7 +6,6 @@
 
 #include "rub.h"
 
-f
 int main( int argc, char **argv ) {
   struct rub_t *rub = rub_get_request();
   struct evkeyval *kv;

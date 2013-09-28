@@ -110,6 +110,26 @@ void rub_reset_request() {
 
 }
 
+void error_function( void *user, const char *msg ) {
+  struct rub_t *r = &rub;
+
+  evbuffer_add_printf( r->evb, "<html><head><title>Rub Compilation error</title></head>");
+  evbuffer_add_printf( r->evb, "Error: %s", msg );
+  evbuffer_add_printf( r->evb, "</html>" );
+
+  syslog(LOG_ERR,"HERE: %s", msg );
+}
+
+/**
+ *  Free controller, it does not unlink from main list
+ *  or other data structures
+ */
+void free_controller( struct controller_t *c ) {
+  free(c->path);
+  tcc_delete(c->state);
+  free(c); 
+}
+
 /**
  *  Load a controller and compile it, we map general system errors 
  *  to a HTTP friendly value set in ecode, or we set ecode to 404 if 
@@ -141,6 +161,8 @@ struct controller_t * load_controller( char * fpath, int *ecode ) {
   tcc_set_lib_path( cont->state, "./tcc" );
 
   tcc_set_output_type( cont->state, TCC_OUTPUT_MEMORY );
+  tcc_set_error_func( cont->state, source, error_function );
+
   if( tcc_compile_string( cont->state, source ) == -1 ) {
     // File was found and it was not compilable
     *ecode = HTTP_INTERNAL;
@@ -178,55 +200,46 @@ err:
  */
 int run_controller( struct rub_t *rub, char * fpath  ){
   struct controller_t *iter = controllers;
+  struct controller_t *prev = controllers;
   int err=HTTP_OK;
 
   while( iter ) {
     if( strcmp(iter->path, fpath) == 0 ) {
       break;
     } 
+    // Keep link to previous node so we can delete the iter if necessary
+    prev = iter;
     iter = iter->next;
   }
 
+  // Nothing found - try loading and compiling
   if( !iter ) {
     iter = load_controller( fpath, &err );
     if( iter )  {
       // We loaded it, link it in our list of controllers
       iter->next = controllers;
-      controllers = iter;
+      prev = controllers = iter;
     }
   }
 
   // Finally run it if we have one
-  if( iter ) {
+  if( iter && iter->prog_main ) {
     iter->prog_main(0,0);
   } else {
-    // There was a system error, a compilation error or the script was not
-    // found 
+    // We found it but could not compile it 
+    if( iter && !iter->prog_main ) {
+      // Compile error - cleanup so we can reload the script next time
+      prev->next = iter->next;
+      if( prev == iter ) {
+        // If iter is the first [prev == iter] then reset head pointer
+        controllers = prev->next; 
+      } 
+      free_controller( iter );
+    }
     return err;
   }
 
 }
-
-#if 0
-static const struct table_entry {
-    const char *extension;
-    const char *content_type;
-} content_type_table[] = {
-    { "txt", "text/plain" },
-    { "c", "text/plain" },
-    { "h", "text/plain" },
-    { "html", "text/html" },
-    { "htm", "text/htm" },
-    { "css", "text/css" },
-    { "gif", "image/gif" },
-    { "jpg", "image/jpeg" },
-    { "jpeg", "image/jpeg" },
-    { "png", "image/png" },
-    { "pdf", "application/pdf" },
-    { "ps", "application/postsript" },
-    { NULL, NULL },
-};
-#endif
 
 /* Try to guess a good content-type for 'path' */
 static const char *
