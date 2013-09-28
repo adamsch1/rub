@@ -38,9 +38,9 @@ Pretty crazy but it works like a charm.
 The above program does what you think it would do.  Rub compiles it once, caches that compilation and executes it.
 
 Planned changes:
-  - ~Get system to properly send data back to the browser [or whomever]~
+  - ~~Get system to properly send data back to the browser [or whomever]~~
   - Config option to check if scripts should be recompiled when updated or not
-  - ~Config option to dump compilation errors of script to HTML for ease of debugging~
+  - ~~Config option to dump compilation errors of script to HTML for ease of debugging~~
   - #pragma in tcc to add additional libraries and paths for compilation something like 
   - Utilize more than one core 
   - add feature in tcc to support reflection for C 
