@@ -40,6 +40,7 @@ struct controller_t *controllers;
 struct rub_t rub;
 
 extern struct config_t *global_config;
+extern const struct table_entry *content_type_table;
 
 /**
  *  Symbols you want exported to controller set here
@@ -252,17 +253,12 @@ guess_content_type(const char *path)
 {
     const char *last_period, *extension;
     const struct table_entry *ent;
-    static const struct table_entry *table = NULL;
-
-    if( !table ) {
-      table = config_get_obj("content_type_table");
-    }
 
     last_period = strrchr(path, '.');
     if (!last_period || strchr(last_period, '/'))
         goto not_found; /* no exension */
     extension = last_period + 1;
-    for (ent = &table[0]; ent->extension; ++ent) {
+    for (ent = content_type_table; ent->extension; ++ent) {
         if (!evutil_ascii_strcasecmp(ent->extension, extension))
             return ent->content_type;
     }

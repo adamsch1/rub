@@ -38,6 +38,7 @@
  */
 TCCState *config_state;
 const struct config_t *global_config;
+const struct table_entry *content_type_table;
 
 /**
  *  Dump command line usage
@@ -243,6 +244,8 @@ int main(int argc, char **argv)
   free(config);
 
   global_config = config_get_obj( "config" );
+  content_type_table = config_get_obj("content_type_table");
+
 /*
   port = config_get_int( "RPort" );
   doc_root = config_get_str( "RDocRoot" );
