@@ -16,6 +16,8 @@ const void * config_get_obj( const char *name );
 struct rub_t {
   struct evhttp_request *req;
   struct evbuffer *evb;
+  struct evkeyvalq *post_data;
+  struct evkeyvalq *query_data;
   int a;
 };
 

@@ -9,6 +9,7 @@
 
 #include <event2/event.h>
 #include <event2/http.h>
+#include <event2/http_struct.h>
 #include <event2/buffer.h>
 #include <event2/util.h>
 #include <event2/keyvalq_struct.h>
@@ -64,10 +65,43 @@ void set_symbols( struct controller_t *cont ) {
 }
 
 /**
+ *  Parse request data [FORM/Query]
+ */
+void parse_request_data( struct evbuffer *input, struct evkeyvalq *kv )  {
+  int length = evbuffer_get_length(input);
+  if( length ) {
+    char *data = malloc(length);
+    evbuffer_copyout( input, data, length );
+    //syslog(LOG_INFO, "LENGTH=%d %s", length, data);
+    evhttp_parse_query_str( data, kv );
+    free(data);
+  }
+}
+
+/**
  *  We chuck a bunch of libevent http stuff in a rub_t struct
  */
 struct rub_t * rub_get_request()  {
+
+  rub.post_data = calloc(1, sizeof( struct evkeyvalq));
+  rub.query_data = calloc(1, sizeof( struct evkeyvalq));
+
+  // Parse POST form data, if any  
+  
+  parse_request_data( rub.req->input_buffer, rub.post_data );
+
   return &rub;
+}
+
+/**
+ * Free memory
+ */
+void rub_reset_request() {
+  evhttp_clear_headers( rub.post_data );
+  evhttp_clear_headers( rub.query_data );
+
+  free(rub.post_data);
+  free(rub.query_data);
 }
 
 /**
@@ -317,6 +351,8 @@ done:
 
   if( rub.evb ) evbuffer_free( rub.evb );
   if( final_path ) free(final_path); 
+
+  rub_reset_request();
    
 }
 
