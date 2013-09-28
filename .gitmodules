@@ -1,3 +1,6 @@
 [submodule "tcc"]
 	path = tcc
 	url = https://github.com/adamsch1/tcc
+[submodule "libuv"]
+	path = libuv
+	url = https://github.com/adamsch1/libuv.git
