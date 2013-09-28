@@ -97,11 +97,17 @@ struct rub_t * rub_get_request()  {
  * Free memory
  */
 void rub_reset_request() {
-  evhttp_clear_headers( rub.post_data );
-  evhttp_clear_headers( rub.query_data );
 
-  free(rub.post_data);
-  free(rub.query_data);
+  if( rub.post_data ) {
+    evhttp_clear_headers( rub.post_data );
+    free(rub.post_data);
+  }
+  if( rub.query_data ) {
+    evhttp_clear_headers( rub.query_data );
+    free(rub.query_data);
+  }
+  if( rub.evb ) evbuffer_free( rub.evb );
+
 }
 
 /**
@@ -313,6 +319,7 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   char * final_path = NULL;
 
   // Setup data structure we pass to controllers
+  memset(&rub, 0, sizeof(rub));
   rub.req = req;
   rub.evb = evbuffer_new();
 
@@ -349,7 +356,6 @@ void route_request_cb( struct evhttp_request *req, void *arg ) {
   syslog( LOG_INFO, "%s", log_format( FMT, req, response_size) );
 done:
 
-  if( rub.evb ) evbuffer_free( rub.evb );
   if( final_path ) free(final_path); 
 
   rub_reset_request();
