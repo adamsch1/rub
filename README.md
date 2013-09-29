@@ -14,21 +14,38 @@ so I went with it.
 
 The rub application is controlled by a config file that looks something like this:
 
-shane@slurp:~/rub$ more rub.conf
-// Word
-
-const int RPort = 8888;
-const char *RDocRoot = "/tmp";
-
+    shane@slurp:~/rub$ more rub.conf
+    // Word
+    const int RPort = 8888;
+    const char *RDocRoot = "/tmp";
+    const char *RScriptRoot = "controllers/";
 
 Yes, the config file is just C code that gets compiled dynimcally.  Internally the code then does something like this:
 
-int port = config_get_int( "RPort" );
+    int port = config_get_int( "RPort" );
 
 Pretty crazy but it works like a charm.
 
+    shane@slurp:~/rub$ more controllers/test.c
+    #include <stdlib.h>
+    #include <stdio.h>
+    
+    int main( int argc, char **argv ) {
+        printf("Hello world\n\n");
+        return 200;
+    }
 
+The above program does what you think it would do.  Rub compiles it once, caches that compilation and executes it.
 
+Planned changes:
+  - Get system to properly send data back to the browser [or whomever]
+  - Config option to check if scripts should be recompiled when updated or not
+  - Config option to dump compilation errors of script to HTML for ease of debugging
+  - #pragma in tcc to add additional libraries and paths for compilation something like 
+  - Utilize more than one core 
+  - add feature in tcc to support reflection for C 
+  - Once reflection is done implement Annotations for functions, variables, structs etc
+  
 For more info on TinyC check out -
 
 http://bellard.org/tcc/tcc-doc.html#SEC22
