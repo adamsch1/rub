@@ -324,6 +324,38 @@ done:
 
 const char * FMT = "%h %l %u %t %s %r";
 
+void route_request( struct client_t *client, void *arg ) {
+  char * final_path = NULL;
+
+  // Setup data structure we pass to controllers
+  memset(&rub, 0, sizeof(rub));
+  rub.client = client;
+
+  // Calculate final script path  
+  if( strstr(client->url, "../" ))  {
+    //evhttp_send_reply(req, HTTP_BADREQUEST, "OK", NULL );
+    goto done;
+  }
+
+  asprintf( &final_path, "%s%s", global_config->script_root, 
+            *client->url == '/' ? client->url+1 : client->url );
+
+  int ecode = run_controller( &rub, final_path );
+  if( ecode == HTTP_NOTFOUND ) {
+    ecode =send_file( client->url, &rub );
+  }
+
+  //response_size = evbuffer_get_length( rub.evb );
+  //evhttp_send_reply(req, ecode, "OK", rub.evb );
+
+  //syslog( LOG_INFO, "%s", log_format( FMT, req, response_size) );
+done:
+
+  if( final_path ) free(final_path); 
+
+  rub_reset_request();
+}
+
 void route_request_cb( struct evhttp_request *req, void *arg ) {
   const struct evhttp_uri *decoded;
   const char *uri = evhttp_request_get_uri(req);

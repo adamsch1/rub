@@ -9,14 +9,18 @@ configure_file (
   "${PROJECT_SOURCE_DIR}/rub.h"
 )
 
+include_directories(/usr/local/include)
+LINK_DIRECTORIES( /usr/local/lib )
+SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} /usr/local/lib)
 
 set(TCC tcc)
 set(CMAKE_BUILD_TYPE Debug)
-SET(P_SOURCE http-server.c route.c)
+#SET(P_SOURCE http-server.c route.c)
+SET(P_SOURCE rub.c route.c )
 
 include_directories("${PROJECT_BINARY_DIR}")
 
-add_executable(rub ${P_SOURCE})
+add_executable(rub ${P_SOURCE} http-parser/http_parser.o)
 
-TARGET_LINK_LIBRARIES(rub event libtcc.a dl)
+TARGET_LINK_LIBRARIES(rub event libtcc.a dl uv)
 
