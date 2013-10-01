@@ -325,6 +325,7 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf ) {
  * Done with write
  */
 void write_cb( uv_write_t *req, int status ) {
+  syslog( LOG_ERR, "CHECK: %d", status);
   uv_close((uv_handle_t*)req->data, close_cb);
 }
 

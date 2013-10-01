@@ -305,7 +305,8 @@ int send_file( const char *path, struct client_t *rub ) {
   read(fd, fb, st.st_size );
   rub->outs.s = fb;
   rub->outs.len = st.st_size;
-  
+  close(fd);
+ 
 /*
   evhttp_add_header( evhttp_request_get_output_headers(rub->req),
                      "Content-Type", type );
