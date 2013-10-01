@@ -37,7 +37,7 @@ struct controller_t {
 struct controller_t *controllers;
 
 // Anything we want passed to child script we place in this
-struct rub_t rub;
+struct client_t *gclient;
 
 extern struct config_t *global_config;
 extern const struct table_entry *content_type_table;
@@ -82,18 +82,18 @@ void parse_request_data( struct evbuffer *input, struct evkeyvalq *kv )  {
 }
 
 /**
- *  We chuck a bunch of libevent http stuff in a rub_t struct
+ *  We chuck a bunch of libevent http stuff in a  struct
  */
-struct rub_t * rub_get_request()  {
+struct client_t * rub_get_request()  {
 
-  rub.post_data = calloc(1, sizeof( struct evkeyvalq));
-  rub.query_data = calloc(1, sizeof( struct evkeyvalq));
+  //rub.post_data = calloc(1, sizeof( struct evkeyvalq));
+  //rub.query_data = calloc(1, sizeof( struct evkeyvalq));
 
   // Parse POST form data, if any  
   
-  parse_request_data( rub.req->input_buffer, rub.post_data );
+  //parse_request_data( rub.req->input_buffer, rub.post_data );
 
-  return &rub;
+  //return client;
 }
 
 /**
@@ -101,6 +101,7 @@ struct rub_t * rub_get_request()  {
  */
 void rub_reset_request() {
 
+#if 0
   if( rub.post_data ) {
     evhttp_clear_headers( rub.post_data );
     free(rub.post_data);
@@ -110,17 +111,16 @@ void rub_reset_request() {
     free(rub.query_data);
   }
   if( rub.evb ) evbuffer_free( rub.evb );
-
+#endif
 }
 
 
 void error_function( void *user, const char *msg ) {
-  struct rub_t *r = &rub;
 
   if( global_config->display_error  ) {
-    evbuffer_add_printf( r->evb, "<html><head><title>Rub Compilation error</title></head>");
-    evbuffer_add_printf( r->evb, "Error: %s", msg );
-    evbuffer_add_printf( r->evb, "</html>" );
+    bappend_printf( &gclient->outs, "<html><head><title>Rub Compilation error</title></head>");
+    bappend_printf( &gclient->outs, "Error: %s", msg );
+    bappend_printf( &gclient->outs, "</html>");
   }
 
   syslog(LOG_ERR, "Compilation error: %s", msg );
@@ -204,7 +204,7 @@ err:
  *  current request.  If this is the first time a controller has run
  *  compile and cache the result.
  */
-int run_controller( struct rub_t *rub, char * fpath  ){
+int run_controller( struct client_t *client, char * fpath  ){
   struct controller_t *iter = controllers;
   struct controller_t *prev = controllers;
   int err=HTTP_OK;
@@ -267,12 +267,10 @@ not_found:
     return "application/misc";
 }
 
-
-
 /**
  *  Send a normal file back - no attempt to compile or interpret
  */
-int send_file( const char *path, struct rub_t *rub ) {
+int send_file( const char *path, struct client_t *rub ) {
   int ecode = HTTP_NOTFOUND;
   struct stat st;
   char *final_path = NULL;
@@ -287,7 +285,7 @@ int send_file( const char *path, struct rub_t *rub ) {
   asprintf( &final_path, "%s%s", global_config->doc_root, 
             path[0] == '/' ? path+1 : path );
   if( strstr(path, "../" ))  {
-    evhttp_send_reply(rub->req, HTTP_BADREQUEST, "OK", NULL );
+    //evhttp_send_reply(rub->req, HTTP_BADREQUEST, "OK", NULL );
     goto done;
   }
 
@@ -303,10 +301,16 @@ int send_file( const char *path, struct rub_t *rub ) {
     goto err;
   }
 
+  char *fb = malloc( st.st_size +1 );
+  read(fd, fb, st.st_size );
+  rub->outs.s = fb;
+  rub->outs.len = st.st_size;
+  
+/*
   evhttp_add_header( evhttp_request_get_output_headers(rub->req),
                      "Content-Type", type );
   evbuffer_add_file( rub->evb, fd, 0, st.st_size );
-
+*/
   ecode = HTTP_OK;
 
   goto done;
@@ -322,14 +326,24 @@ done:
   return ecode;
 }
 
+void client_send_reply( struct client_t *client, int code, 
+                        const char *reason ) {
+  client->http_code = code;
+  char *k;
+   
+  asprintf( &k, "HTTP/1.1 %d %s\r\n", code, reason );
+  add_header( client, k );
+  free(k);
+
+  asprintf( &k, "Content-Encoding: %s\r\n", "text/html");
+  add_header( client, k );
+  free(k);
+}
+
 const char * FMT = "%h %l %u %t %s %r";
 
 void route_request( struct client_t *client, void *arg ) {
   char * final_path = NULL;
-
-  // Setup data structure we pass to controllers
-  memset(&rub, 0, sizeof(rub));
-  rub.client = client;
 
   // Calculate final script path  
   if( strstr(client->url, "../" ))  {
@@ -340,12 +354,15 @@ void route_request( struct client_t *client, void *arg ) {
   asprintf( &final_path, "%s%s", global_config->script_root, 
             *client->url == '/' ? client->url+1 : client->url );
 
-  int ecode = run_controller( &rub, final_path );
+  gclient = client;
+
+  int ecode = run_controller( client, final_path );
   if( ecode == HTTP_NOTFOUND ) {
-    ecode =send_file( client->url, &rub );
+    ecode =send_file( client->url, client );
   }
 
-  //response_size = evbuffer_get_length( rub.evb );
+  int response_size = client->outs.len;
+  client_send_reply( client, ecode, "OK");
   //evhttp_send_reply(req, ecode, "OK", rub.evb );
 
   //syslog( LOG_INFO, "%s", log_format( FMT, req, response_size) );
@@ -355,7 +372,7 @@ done:
 
   rub_reset_request();
 }
-
+#if 0
 void route_request_cb( struct evhttp_request *req, void *arg ) {
   const struct evhttp_uri *decoded;
   const char *uri = evhttp_request_get_uri(req);
@@ -401,4 +418,4 @@ done:
   rub_reset_request();
    
 }
-
+#endif

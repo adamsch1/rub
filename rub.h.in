@@ -11,12 +11,30 @@
 
 #include "http-parser/http_parser.h"
 
+/* Response codes */
+/* taken from libevent */
+#define HTTP_OK         200 /**< request completed ok */
+#define HTTP_NOCONTENT      204 /**< request does not have content */
+#define HTTP_MOVEPERM       301 /**< the uri moved permanently */
+#define HTTP_MOVETEMP       302 /**< the uri moved temporarily */
+#define HTTP_NOTMODIFIED    304 /**< page was not modified from last */
+#define HTTP_BADREQUEST     400 /**< invalid http request was made */
+#define HTTP_NOTFOUND       404 /**< could not find content for uri */
+#define HTTP_BADMETHOD      405     /**< method not allowed for this uri */
+#define HTTP_ENTITYTOOLARGE 413 /**<  */
+#define HTTP_EXPECTATIONFAILED  417 /**< we can't handle this expectation */
+#define HTTP_INTERNAL           500     /**< internal error */
+#define HTTP_NOTIMPLEMENTED     501     /**< not implemented */
+#define HTTP_SERVUNAVAIL    503 /**< the server is not available */
+
+
 void route_request_cb( struct evhttp_request *req, void *arg );
 int config_get_int( const char *name );
 const char * config_get_str( const char *name );
 char * source_file( const char *fpath );
 const void * config_get_obj( const char *name );
 
+/** Easy to use string library **/
 struct bt {
   char *s;
   int len;
@@ -41,20 +59,15 @@ struct client_t {
   http_parser parser;
   uv_write_t write_req;
   uv_buf_t resbuf;
-
+  int http_code;
+  char reason[32];
   struct bt outs;
+
+  uv_buf_t rheaders[100];
+  int   rheader_count;
+
   struct kv_t *headers;
   char *url;
-};
-
-struct rub_t {
-  struct client_t *client;
-
-  struct evhttp_request *req;
-  struct evbuffer *evb;
-  struct evkeyvalq *post_data;
-  struct evkeyvalq *query_data;
-  int a;
 };
 
 struct table_entry {
@@ -70,9 +83,10 @@ struct config_t {
   int display_error;
 };
 
-struct rub_t *rub_get_request();
+struct client_t *rub_get_request();
 void route_request( struct client_t *client, void *arg );
 
+void add_header( struct client_t *client, const char * h);
 
 const char * log_format( const char *fmt, struct evhttp_request *req,
                          int response_size );

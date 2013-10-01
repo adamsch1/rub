@@ -218,6 +218,7 @@ const char * log_format( const char *fmt, struct evhttp_request *req,
 
 /**
  *  Given base, keeps doublying until greater than num
+ *  Heavily borrowed this stuff from GLIB 
  */
 static int nearest_power( int base, int num ) {
   int n = base;
@@ -333,18 +334,37 @@ void write_cb( uv_write_t *req, int status ) {
 int on_headers_complete( http_parser *parser ) {
   struct client_t *client = parser->data;
 
-  bappend_printf( &client->outs, "<html>Dude: %s", "welcome!");
-  bappend_printf( &client->outs, "Dude: %s</html>", "welcome!");
+  //bappend_printf( &client->outs, "<html>Dude: %s", "welcome!");
+  //bappend_printf( &client->outs, "Dude: %s</html>", "welcome!");
 
-  //route_request( client, NULL );
+  route_request( client, NULL );
 
-  client->resbuf.base = client->outs.s;
-  client->resbuf.len = client->outs.len;
+  add_header( client, "\r\n\r\n");
 
+  client->rheaders[ client->rheader_count ].base = client->outs.s; 
+  client->rheaders[ client->rheader_count ].len = client->outs.len; 
+  client->rheader_count++;
+
+//  client->resbuf.base = client->outs.s;
+//  client->resbuf.len = client->outs.len;
+
+//  uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
+//           &client->resbuf, 1, write_cb );
   uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
-           &client->resbuf, 1, write_cb );
+           client->rheaders, client->rheader_count, write_cb );
 
   return 1;
+}
+
+void add_header( struct client_t *client, const char *h ) {
+
+  if( client->rheader_count < 18 ) {
+    client->rheaders[ client->rheader_count ].base = strdup(h);
+    client->rheaders[ client->rheader_count ].len = strlen(h);
+    client->rheader_count++;
+  } else {
+    syslog( LOG_ERR, "Exceeded max header response");
+  }
 }
 
 /**
@@ -397,6 +417,7 @@ int on_url( http_parser *parser, const char *at, size_t length ) {
 void close_cb( uv_handle_t *handle ) {
   struct client_t *client = handle->data;
   struct kv_t *header = client->headers;
+  int k;
 
   while( header ) {
     struct kv_t *temp = header->next;
@@ -404,7 +425,22 @@ void close_cb( uv_handle_t *handle ) {
     free(header->value);
     free(header);
     header = temp;
+  }
+
+  for( k=0; k<client->rheader_count; k++ ) {
+    free( client->rheaders[k].base );
+  }
+ 
+  while( header ) {
+    struct kv_t *temp = header->next;
+    free(header->key);
+    free(header->value);
+    free(header);
+    header = temp;
   } 
+
+
+
   free(client->resbuf.base);
   free(client->url);
   free(client);
