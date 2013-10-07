@@ -259,22 +259,19 @@ void write_cb( uv_write_t *req, int status ) {
 int on_headers_complete( http_parser *parser ) {
   struct client_t *client = parser->data;
 
-  //bappend_printf( &client->outs, "<html>Dude: %s", "welcome!");
-  //bappend_printf( &client->outs, "Dude: %s</html>", "welcome!");
-
   route_request( client, NULL );
 
+  // Route_request will add all the headers  - we add the final body
   add_header( client, "\r\n\r\n");
 
+  // The finaly body is in client->outs however our data to send back 
+  // is stored in an array of buffers which libuv can write in one shot
+  // so reassign cleint->outs to be the last item in the array.  
   client->rheaders[ client->rheader_count ].base = client->outs.s; 
   client->rheaders[ client->rheader_count ].len = client->outs.len; 
   client->rheader_count++;
 
-//  client->resbuf.base = client->outs.s;
-//  client->resbuf.len = client->outs.len;
-
-//  uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
-//           &client->resbuf, 1, write_cb );
+  // We can now write everything in one shot [like writev]
   uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
            client->rheaders, client->rheader_count, write_cb );
 
@@ -283,6 +280,7 @@ int on_headers_complete( http_parser *parser ) {
 
 void add_header( struct client_t *client, const char *h ) {
 
+  // Check if they have too many headers - 18? Why the fuck not.
   if( client->rheader_count < 18 ) {
     client->rheaders[ client->rheader_count ].base = strdup(h);
     client->rheaders[ client->rheader_count ].len = strlen(h);
@@ -363,8 +361,6 @@ void close_cb( uv_handle_t *handle ) {
     free(header);
     header = temp;
   } 
-
-
 
   free(client->resbuf.base);
   free(client->url);
@@ -464,38 +460,5 @@ int main(int argc, char **argv)
   syslog( LOG_INFO, "Rub is ready.");
   uv_run(loop, UV_RUN_DEFAULT);
   
-/*
-  port = config_get_int( "RPort" );
-  doc_root = config_get_str( "RDocRoot" );
-  address = config_get_str( "RAddress" );
-  script_root = config_get_str( "RScriptRoot" );
-  // Start setting up libevent for HTTP
-  base = event_base_new();
-  if (!base) {
-    syslog( LOG_ERR, "Couldn't create an event_base: exiting\n");
-    return 1;
-  }
-
-  http = evhttp_new(base);
-  if (!http) {
-    syslog( LOG_ERR, "Couldn't create evhttp: exiting\n");
-    return 1;
-  }
-
-  //evhttp_set_gencb(http, send_document_cb, strdup(doc_root));
-  evhttp_set_gencb(http, route_request_cb, NULL );
-
-  handle = evhttp_bind_socket_with_handle(http, global_config->address, 
-                                          global_config->port);
-  if (!handle) {
-    syslog( LOG_ERR, "Could not bind to port %d: exiting", 
-            (int)global_config->port);
-    return 1;
-  }
-
-  syslog( LOG_INFO, "Rub is ready.");
-  event_base_dispatch(base);
-*/
-
   return 0;
 }
