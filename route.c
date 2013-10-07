@@ -110,7 +110,6 @@ struct client_t * rub_get_request()  {
 
   //return client;
 
-  printf("FUCKSUCK");
   return gclient;
 }
 
@@ -120,6 +119,7 @@ struct client_t * rub_get_request()  {
 void rub_reset_request(struct client_t *client) {
   int k=0;
 
+  // Free GET fields [parsed query params]
   if( client->get_fields.len ) {
     for( k=0; k<client->get_fields.len; k++ ) {
       struct kv_t *kv;
@@ -129,6 +129,8 @@ void rub_reset_request(struct client_t *client) {
     }
     afree(&client->get_fields);
   }
+
+  if( client->query ) free(client->query);
 }
 
 
@@ -360,30 +362,52 @@ void client_send_reply( struct client_t *client, int code,
 
 const char * FMT = "%h %l %u %t %s %r";
 
-void route_request( struct client_t *client, void *arg ) {
-  char * final_path = NULL;
+/**
+ *  Construct the on-disk resource path from the http request
+ */
+char * parse_final_path( struct client_t *client ) {
+  char *final_path = NULL;
 
-  // Calculate final script path  
-  if( strstr(client->url, "../" ))  {
-    goto done;
-  }
-
+  // Script root concatenated with the client URL
   asprintf( &final_path, "%s%s", global_config->script_root, 
             *client->url == '/' ? client->url+1 : client->url );
 
-  gclient = client;
+
+  // Isolate query portion, remove from final_path
+  char *p = strchr(final_path, '?');
+  if( p ) {
+    *p = 0;
+    client->query = strdup(p+1);
+  }
+
+  return final_path;
+}
+
+/**
+ *  We may have GET/POST fields - parse as necessary
+ */
+void parse_get_post_fields( struct client_t *client ) {
 
   // Initialize final portions of client strucutre 
   // basically anything we parse/add in route.c initialize
   anew( &client->get_fields, sizeof(struct kv_t), 0 );
 
-  // Terminate trailing ? if any
-  char *p = strchr(final_path, '?');
-  if( p ) {
-    // Parse get fields
-    parse_request_data( p+1, &client->get_fields );
-    *p = 0;
+  // Parse get fields
+  parse_request_data( client->query, &client->get_fields );
+}
+
+void route_request( struct client_t *client, void *arg ) {
+  char * final_path = NULL;
+
+  gclient = client;
+
+  // Avoid trickery
+  if( strstr(client->url, "../" ))  {
+    goto done;
   }
+
+  final_path = parse_final_path( client );
+  parse_get_post_fields( client );
 
   int ecode = run_controller( client, final_path );
   if( ecode == HTTP_NOTFOUND ) {
