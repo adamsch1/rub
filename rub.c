@@ -438,6 +438,11 @@ int main(int argc, char **argv)
   free(config);
 
   global_config = config_get_obj( "config" );
+  if( !global_config ) {
+    syslog( LOG_ERR, "Could not parse in: %s", argv[1]);
+    fprintf( stderr, "Could not parse in: %s\n", argv[1]);
+    return 1;
+  }
   content_type_table = config_get_obj("content_type_table");
 
   // Setup libuv networking loop
