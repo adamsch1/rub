@@ -94,6 +94,8 @@ struct client_t * rub_get_request()  {
   //parse_request_data( rub.req->input_buffer, rub.post_data );
 
   //return client;
+
+  return gclient;
 }
 
 /**
