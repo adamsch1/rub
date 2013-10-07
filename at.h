@@ -14,5 +14,6 @@ struct at {
 int anew( struct at *buf, size_t size, int capacity );
 void afree( struct at *buf );
 void aadd( struct at *buf, void *thing );
+void * aget( struct at *buf, int pos ) ;
 
 #endif

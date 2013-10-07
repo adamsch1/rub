@@ -1,12 +1,4 @@
 /* -*- Mode: C; tab-width: 2; indent-tabs-mode: f; c-basic-offset: 2 -*- */
-/*
-  A trivial static http webserver using Libevent's evhttp.
-
-  This is not the best code in the world, and it does some fairly stupid stuff
-  that you would never want to do in a production webserver. Caveat hackor!
-
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

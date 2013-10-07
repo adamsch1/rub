@@ -1,3 +1,4 @@
+/* -*- Mode: C; tab-width: 2; indent-tabs-mode: f; c-basic-offset: 2 -*- */
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -70,15 +71,29 @@ void set_symbols( struct controller_t *cont ) {
 /**
  *  Parse request data [FORM/Query]
  */
-void parse_request_data( struct evbuffer *input, struct evkeyvalq *kv )  {
-  int length = evbuffer_get_length(input);
-  if( length ) {
-    char *data = malloc(length);
-    evbuffer_copyout( input, data, length );
-    //syslog(LOG_INFO, "LENGTH=%d %s", length, data);
-    evhttp_parse_query_str( data, kv );
-    free(data);
+void parse_request_data( char *input, struct at *array )  {
+  if( input ) {
+     char *argument = input;
+     char *p = input;
+     struct kv_t n;
+
+     while( p != NULL && *p != '\0' ) {
+       char *key, *value;
+    
+       argument = strsep(&p, "&" ); 
+       value = argument;
+       key = strsep( &value, "=");
+       if( value == NULL || *key == '\0' )  {
+         return;
+       }
+ 
+       n.key = strdup(key);
+       n.value = strdup(value);
+      
+       aadd( array, &n ); 
+    }
   }
+
 }
 
 /**
@@ -91,29 +106,29 @@ struct client_t * rub_get_request()  {
 
   // Parse POST form data, if any  
   
-  //parse_request_data( rub.req->input_buffer, rub.post_data );
+  //parse_request_data( gclient->url );
 
   //return client;
 
+  printf("FUCKSUCK");
   return gclient;
 }
 
 /**
  * Free memory
  */
-void rub_reset_request() {
+void rub_reset_request(struct client_t *client) {
+  int k=0;
 
-#if 0
-  if( rub.post_data ) {
-    evhttp_clear_headers( rub.post_data );
-    free(rub.post_data);
+  if( client->get_fields.len ) {
+    for( k=0; k<client->get_fields.len; k++ ) {
+      struct kv_t *kv;
+      kv = aget( &client->get_fields, k );
+      free(kv->key);
+      free(kv->value);
+    }
+    afree(&client->get_fields);
   }
-  if( rub.query_data ) {
-    evhttp_clear_headers( rub.query_data );
-    free(rub.query_data);
-  }
-  if( rub.evb ) evbuffer_free( rub.evb );
-#endif
 }
 
 
@@ -350,7 +365,6 @@ void route_request( struct client_t *client, void *arg ) {
 
   // Calculate final script path  
   if( strstr(client->url, "../" ))  {
-    //evhttp_send_reply(req, HTTP_BADREQUEST, "OK", NULL );
     goto done;
   }
 
@@ -359,6 +373,18 @@ void route_request( struct client_t *client, void *arg ) {
 
   gclient = client;
 
+  // Initialize final portions of client strucutre 
+  // basically anything we parse/add in route.c initialize
+  anew( &client->get_fields, sizeof(struct kv_t), 0 );
+
+  // Terminate trailing ? if any
+  char *p = strchr(final_path, '?');
+  if( p ) {
+    // Parse get fields
+    parse_request_data( p+1, &client->get_fields );
+    *p = 0;
+  }
+
   int ecode = run_controller( client, final_path );
   if( ecode == HTTP_NOTFOUND ) {
     ecode =send_file( client->url, client );
@@ -366,14 +392,13 @@ void route_request( struct client_t *client, void *arg ) {
 
   int response_size = client->outs.len;
   client_send_reply( client, ecode, "OK");
-  //evhttp_send_reply(req, ecode, "OK", rub.evb );
 
   //syslog( LOG_INFO, "%s", log_format( FMT, req, response_size) );
 done:
 
   if( final_path ) free(final_path); 
 
-  rub_reset_request();
+  rub_reset_request(client);
 }
 #if 0
 void route_request_cb( struct evhttp_request *req, void *arg ) {

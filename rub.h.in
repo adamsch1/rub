@@ -59,6 +59,8 @@ struct client_t {
   // Public fields 
   struct kv_t *headers;
   char *url;
+
+  struct at get_fields;
 };
 
 struct table_entry {
