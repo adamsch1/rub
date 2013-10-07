@@ -31,14 +31,7 @@ static void bregrow( struct bt *buf, int len ) {
 /**
  *  Allocate a new bt string - str is optional
  */
-struct bt * bnew( struct bt *buf, char *str ) {
-
-  if( !buf ) {
-    buf = calloc(1, sizeof(struct bt));
-    buf->allocated = 1;
-  } else {
-    buf->allocated = 0;
-  }
+int bnew( struct bt *buf, char *str ) {
 
   if( str ) {
     buf->s = strdup(str);
@@ -48,7 +41,7 @@ struct bt * bnew( struct bt *buf, char *str ) {
     buf->len = buf->alen = 0;
   }
 
-  return buf;
+  return 0;
 }
 
 /**

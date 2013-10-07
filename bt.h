@@ -11,7 +11,7 @@ struct bt {
   int allocated: 1;
 };
 
-struct bt * bnew( struct bt *buf, char *str );
+int bnew( struct bt *buf, char *str );
 void bfree( struct bt *buf );
 void bappend_vprintf( struct bt *buf, const char *format, va_list args );
 void bappend_printf( struct bt *buf, const char *format, ... );

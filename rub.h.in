@@ -11,6 +11,7 @@
 
 #include "http-parser/http_parser.h"
 #include "bt.h"
+#include "at.h"
 
 /* Response codes */
 /* taken from libevent */
@@ -51,9 +52,11 @@ struct client_t {
   char reason[32];
   struct bt outs;
 
+  // Response data - don't touch, use functions!
   uv_buf_t rheaders[100];
   int   rheader_count;
 
+  // Public fields 
   struct kv_t *headers;
   char *url;
 };
