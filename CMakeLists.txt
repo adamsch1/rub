@@ -16,7 +16,7 @@ SET(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} /usr/local/lib)
 set(TCC tcc)
 set(CMAKE_BUILD_TYPE Debug)
 #SET(P_SOURCE http-server.c route.c)
-SET(P_SOURCE rub.c route.c )
+SET(P_SOURCE rub.c route.c bt.c)
 
 include_directories("${PROJECT_BINARY_DIR}")
 

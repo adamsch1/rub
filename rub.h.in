@@ -10,6 +10,7 @@
 #include <uv.h>
 
 #include "http-parser/http_parser.h"
+#include "bt.h"
 
 /* Response codes */
 /* taken from libevent */
@@ -33,19 +34,6 @@ int config_get_int( const char *name );
 const char * config_get_str( const char *name );
 char * source_file( const char *fpath );
 const void * config_get_obj( const char *name );
-
-/** Easy to use string library **/
-struct bt {
-  char *s;
-  int len;
-  int alen;
-};
-
-
-int bnew( struct bt *buf, char *str );
-void bfree( struct bt *buf );
-void bappend_vprintf( struct bt *buf, const char *format, va_list args );
-void bappend_printf( struct bt *buf, const char *format, ... );
 
 struct kv_t {
   char *key;
