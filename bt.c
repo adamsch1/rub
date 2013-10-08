@@ -49,7 +49,6 @@ int bnew( struct bt *buf, char *str ) {
  */
 void bfree( struct bt *buf ) {
   free(buf->s);
-  if( buf->allocated ) free(buf);
 }
 
 /**

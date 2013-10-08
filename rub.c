@@ -222,7 +222,7 @@ void read_callback( uv_stream_t *stream, ssize_t read, const uv_buf_t *buf ) {
   size_t parsed = http_parser_execute( &client->parser, &settings,
     buf->base, read == UV_EOF ? 0 : read );
   if( parsed != read ) {
-    uv_close((uv_handle_t*)stream, close_cb);
+    //uv_close((uv_handle_t*)stream, close_cb);
   }
 
   // From alloc_buffer 
@@ -246,11 +246,20 @@ void write_cb( uv_write_t *req, int status ) {
 }
 
 /**
- *  Done with headers
- */
-int on_headers_complete( http_parser *parser ) {
+ *  Data in body
+ */ 
+int on_body_complete( http_parser *parser, const char *at, size_t length ) {
+  struct client_t *client = parser->data;
+  char *s = malloc(length+1);
+  strncpy( s, at, length );
+  *(s+length) = 0;
+  bappend_printf( &client->body, s );
+}
+
+int on_message_complete( http_parser *parser ) {
   struct client_t *client = parser->data;
 
+  syslog( LOG_ERR, "HERE:");
   route_request( client, NULL );
 
   // Route_request will add all the headers  - we add the final body
@@ -266,8 +275,35 @@ int on_headers_complete( http_parser *parser ) {
   // We can now write everything in one shot [like writev]
   uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
            client->rheaders, client->rheader_count, write_cb );
+  syslog( LOG_ERR, "HERE2: ");
 
   return 1;
+}
+
+/**
+ *  Done with headers
+ */
+int on_headers_complete( http_parser *parser ) {
+  struct client_t *client = parser->data;
+
+/*
+  route_request( client, NULL );
+
+  // Route_request will add all the headers  - we add the final body
+  add_header( client, "\r\n\r\n");
+
+  // The finaly body is in client->outs however our data to send back 
+  // is stored in an array of buffers which libuv can write in one shot
+  // so reassign cleint->outs to be the last item in the array.  
+  client->rheaders[ client->rheader_count ].base = client->outs.s; 
+  client->rheaders[ client->rheader_count ].len = client->outs.len; 
+  client->rheader_count++;
+
+  // We can now write everything in one shot [like writev]
+  uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
+           client->rheaders, client->rheader_count, write_cb );
+*/
+  return 0;
 }
 
 void add_header( struct client_t *client, const char *h ) {
@@ -334,6 +370,7 @@ void close_cb( uv_handle_t *handle ) {
   struct kv_t *header = client->headers;
   int k;
 
+  syslog( LOG_ERR, "CloseCB");
   while( header ) {
     struct kv_t *temp = header->next;
     free(header->key);
@@ -354,6 +391,7 @@ void close_cb( uv_handle_t *handle ) {
     header = temp;
   } 
 
+  bfree(&client->body);
   free(client->resbuf.base);
   free(client->url);
   free(client);
@@ -363,6 +401,8 @@ void close_cb( uv_handle_t *handle ) {
  * New connection stuff - 
  */
 void on_new_connection(uv_stream_t *server, int status ) {
+  syslog( LOG_ERR, "Connection");
+
   if( status == -1 ) {
     return;
   }
@@ -399,6 +439,8 @@ int main(int argc, char **argv)
   loop = uv_default_loop();
   uv_tcp_init( loop, &server );
 
+  settings.on_body = on_body_complete;
+  settings.on_message_complete = on_message_complete;
   settings.on_headers_complete = on_headers_complete;
   settings.on_header_field = on_header_field;
   settings.on_header_value = on_header_value;

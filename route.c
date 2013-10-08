@@ -130,6 +130,17 @@ void rub_reset_request(struct client_t *client) {
     afree(&client->get_fields);
   }
 
+  // Free GET fields [parsed query params]
+  if( client->post_fields.len ) {
+    for( k=0; k<client->post_fields.len; k++ ) {
+      struct kv_t *kv;
+      kv = aget( &client->post_fields, k );
+      free(kv->key);
+      free(kv->value);
+    }
+    afree(&client->post_fields);
+  }
+
   if( client->query ) free(client->query);
 }
 
@@ -394,6 +405,10 @@ void parse_get_post_fields( struct client_t *client ) {
 
   // Parse get fields
   parse_request_data( client->query, &client->get_fields );
+
+  // Parse body fields if any
+  anew( &client->post_fields, sizeof(struct kv_t), 0 );
+  parse_request_data( client->body.s, &client->post_fields );
 }
 
 void route_request( struct client_t *client, void *arg ) {
@@ -406,7 +421,10 @@ void route_request( struct client_t *client, void *arg ) {
     goto done;
   }
 
+  // Determine local file path 
   final_path = parse_final_path( client );
+
+  // Parse GET/POST fields
   parse_get_post_fields( client );
 
   int ecode = run_controller( client, final_path );

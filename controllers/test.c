@@ -15,7 +15,13 @@ int main( int argc, char **argv ) {
   for( j=0; j<client->get_fields.len; j++ ) {
     struct kv_t *kv;
     kv = aget( &client->get_fields, j ); 
-    bappend_printf( &client->outs, "%s %s <br>", kv->key, kv->value );
+    bappend_printf( &client->outs, "GET: %s %s <br>", kv->key, kv->value );
+  }
+
+  for( j=0; j<client->post_fields.len; j++ ) {
+    struct kv_t *kv;
+    kv = aget( &client->post_fields, j ); 
+    bappend_printf( &client->outs, "POST: %s %s <br>", kv->key, kv->value );
   }
     
   bappend_printf( &client->outs, "</html>");

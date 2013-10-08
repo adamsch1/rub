@@ -56,12 +56,18 @@ struct client_t {
   uv_buf_t rheaders[100];
   int   rheader_count;
 
-  // Public fields 
+  struct bt body;
+
+  // Public fields below
+
+  // Managed by rub.c
   struct kv_t *headers;
   char *url;
-  char *query;
 
+  // Managed by route.c
+  char *query;
   struct at get_fields;
+  struct at post_fields;
 };
 
 struct table_entry {
