@@ -33,6 +33,7 @@ TCCState *config_state;
 const struct config_t *global_config;
 const struct table_entry *content_type_table;
 
+void write_cb( uv_write_t *req, int status );
 /**
  *  Dump command line usage
  */
@@ -225,6 +226,28 @@ void read_callback( uv_stream_t *stream, ssize_t read, const uv_buf_t *buf ) {
     //uv_close((uv_handle_t*)stream, close_cb);
   }
 
+  //if( client->parser.http_errno ) {
+  //  uv_close((uv_handle_t*)stream, close_cb);
+  //}
+  if( client->parser.http_errno == 0 ) {
+    route_request( client, NULL );
+  }
+
+  // Route_request will add all the headers  - we add the final body
+  add_header( client, "\r\n\r\n");
+
+  // The finaly body is in client->outs however our data to send back 
+  // is stored in an array of buffers which libuv can write in one shot
+  // so reassign cleint->outs to be the last item in the array.  
+  client->rheaders[ client->rheader_count ].base = client->outs.s; 
+  client->rheaders[ client->rheader_count ].len = client->outs.len; 
+  client->rheader_count++;
+
+  // We can now write everything in one shot [like writev]
+  uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
+           client->rheaders, client->rheader_count, write_cb );
+
+
   // From alloc_buffer 
   free(buf->base);
 }
@@ -249,11 +272,20 @@ void write_cb( uv_write_t *req, int status ) {
  */ 
 int on_body_complete( http_parser *parser, const char *at, size_t length ) {
   struct client_t *client = parser->data;
-  bappend_strncat( &client->body, at, length );
+
+  if( client->body.len  > global_config->max_post_size ) {
+    syslog( LOG_INFO, "Exceeded max post size");
+    client_send_reply( client, 500, "OK");
+    return 1;
+  } else {
+    bappend_strncat( &client->body, at, length );
+  }
+  return 0;
 }
 
 int on_message_complete( http_parser *parser ) {
   struct client_t *client = parser->data;
+  return 0;
 
   route_request( client, NULL );
 
