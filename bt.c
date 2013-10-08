@@ -52,6 +52,24 @@ void bfree( struct bt *buf ) {
 }
 
 /**
+ * Copy up to n characters from src always null terminated
+ */
+void bappend_strncat( struct bt *buf, const char *src, int n ) {
+  char ch = 0;
+ 
+  const char *p = src;
+  while( p && *p && n-- > 0) {
+    bregrow( buf, 1 );
+    memcpy( buf->s + buf->len, p, 1 );
+    buf->len += 1;
+    p++;
+  } 
+  bregrow( buf, 1 );
+  memcpy( buf->s + buf->len, &ch, 1 );
+  
+}
+
+/**
  *  Append printf to bt string
  */
 void bappend_printf( struct bt *buf, const char *format, ... ) {

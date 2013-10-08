@@ -241,7 +241,6 @@ void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf ) {
  * Done with write
  */
 void write_cb( uv_write_t *req, int status ) {
-  syslog( LOG_ERR, "CHECK: %d", status);
   uv_close((uv_handle_t*)req->data, close_cb);
 }
 
@@ -250,16 +249,12 @@ void write_cb( uv_write_t *req, int status ) {
  */ 
 int on_body_complete( http_parser *parser, const char *at, size_t length ) {
   struct client_t *client = parser->data;
-  char *s = malloc(length+1);
-  strncpy( s, at, length );
-  *(s+length) = 0;
-  bappend_printf( &client->body, s );
+  bappend_strncat( &client->body, at, length );
 }
 
 int on_message_complete( http_parser *parser ) {
   struct client_t *client = parser->data;
 
-  syslog( LOG_ERR, "HERE:");
   route_request( client, NULL );
 
   // Route_request will add all the headers  - we add the final body
@@ -275,9 +270,8 @@ int on_message_complete( http_parser *parser ) {
   // We can now write everything in one shot [like writev]
   uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
            client->rheaders, client->rheader_count, write_cb );
-  syslog( LOG_ERR, "HERE2: ");
 
-  return 1;
+  return 0;
 }
 
 /**
@@ -286,23 +280,6 @@ int on_message_complete( http_parser *parser ) {
 int on_headers_complete( http_parser *parser ) {
   struct client_t *client = parser->data;
 
-/*
-  route_request( client, NULL );
-
-  // Route_request will add all the headers  - we add the final body
-  add_header( client, "\r\n\r\n");
-
-  // The finaly body is in client->outs however our data to send back 
-  // is stored in an array of buffers which libuv can write in one shot
-  // so reassign cleint->outs to be the last item in the array.  
-  client->rheaders[ client->rheader_count ].base = client->outs.s; 
-  client->rheaders[ client->rheader_count ].len = client->outs.len; 
-  client->rheader_count++;
-
-  // We can now write everything in one shot [like writev]
-  uv_write(&client->write_req, (uv_stream_t*)&client->tcp,
-           client->rheaders, client->rheader_count, write_cb );
-*/
   return 0;
 }
 

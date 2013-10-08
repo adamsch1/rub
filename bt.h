@@ -12,6 +12,7 @@ struct bt {
 };
 
 int bnew( struct bt *buf, char *str );
+void bappend_strncat( struct bt *buf, const char *src, int n );
 void bfree( struct bt *buf );
 void bappend_vprintf( struct bt *buf, const char *format, va_list args );
 void bappend_printf( struct bt *buf, const char *format, ... );
