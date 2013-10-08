@@ -28,7 +28,7 @@ static void aregrow( struct at *buf, int len ) {
 
 int anew( struct at *buf, size_t size, int capacity ) {
   buf->size = size;
-  buf->s = malloc( capacity * size );
+  buf->s = capacity > 0 ? malloc( capacity * size ) : 0;
   buf->alen = capacity;
   buf->len = 0;
 }
