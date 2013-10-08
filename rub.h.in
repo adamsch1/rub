@@ -81,6 +81,7 @@ struct config_t {
   const char *address;
   unsigned short port;
   int display_error;
+  int max_post_size;
 };
 
 struct client_t *rub_get_request();
