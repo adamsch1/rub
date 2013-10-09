@@ -220,6 +220,12 @@ void close_cb( uv_handle_t *handle );
  */
 void read_callback( uv_stream_t *stream, ssize_t read, const uv_buf_t *buf ) {
   struct client_t *client = stream->data;
+
+  if( read < 0 ) {
+    uv_close((uv_handle_t*) client, NULL);
+    return;
+  }
+
   size_t parsed = http_parser_execute( &client->parser, &settings,
     buf->base, read == UV_EOF ? 0 : read );
   if( parsed != read ) {
