@@ -21,7 +21,7 @@ static int nearest_power( int base, int num ) {
 /**
  *  Rewgrows buffer to store up to len more bytes
  */
-static void bregrow( struct bt *buf, int len ) {
+static inline void bregrow( struct bt *buf, int len ) {
   if( buf->len + len >= buf->alen ) {
     buf->alen = nearest_power(1, buf->len + len + 1 );
     buf->s = realloc( buf->s, buf->alen );

@@ -4,6 +4,21 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+/** 
+ * Growable array.  Intentionally minimialist.  
+ *
+ * struct at arr = {0};
+ *
+ * // Create an array to hold 3 ints to begin with
+ * anew( &arr, sizeof(int), 3 );
+ * 
+ * for( int k=0; k<5; k++ ) { 
+ *   aadd( &arr, &k );
+ * }
+ *
+ * int *n = aget( &arr, 3 ); // *n == 4
+ * 
+ */
 struct at {
   char *s;
   int len;

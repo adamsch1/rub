@@ -4,6 +4,19 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
+/**
+ *  Growable string buffer - intentionally minimialist
+ * 
+ *  struct bt string = {0};
+ * 
+ *  // Printf concatentation
+ *  bappend_printf( &string, "Dude: %d", 5 ); // "Dude: 5"
+ * 
+ *  // Copy up to N characters from src, always null terminate
+ *  bappend_strncat( &string, "APPLE!", 5  ); // "Dude: 5APPLE"
+ *
+ *  bfree( &string );
+ */
 struct bt {
   char *s;
   int len;
