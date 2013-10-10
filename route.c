@@ -379,13 +379,16 @@ const char * FMT = "%h %l %u %t %s %r";
 char * parse_final_path( struct client_t *client ) {
   char *final_path = NULL;
 
+  char *p = url_decode( client->url );
+
   // Script root concatenated with the client URL
   asprintf( &final_path, "%s%s", global_config->script_root, 
-            *client->url == '/' ? client->url+1 : client->url );
+            *p == '/' ? p+1 : p );
 
+  if( p ) free(p);
 
   // Isolate query portion, remove from final_path
-  char *p = strchr(final_path, '?');
+  p = strchr(final_path, '?');
   if( p ) {
     *p = 0;
     client->query = strdup(p+1);

@@ -12,6 +12,7 @@
 #include "http-parser/http_parser.h"
 #include "bt.h"
 #include "at.h"
+#include "ut.h"
 
 /* Response codes */
 /* taken from libevent */
